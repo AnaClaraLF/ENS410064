@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import netCDF4 as nc
 
 # caminho para meu arquivo com conc de o3
-path = r'D:\ENS410064\Dados\brutos\BRAIN_ClippedCONC_O3_2019_07_02_11_to_2019_12_30_23.nc'
+path = r'D:\ENS410064\Dados\brutos\ufsc\BRAIN_Clipped_CONC_O3_2019_07_02_11_to_2019_12_30_23.nc'
 
 # abrir arquivo
 data = nc.Dataset(path)
@@ -18,11 +18,11 @@ tflag = data['TFLAG'][:]
 
 #no tempo
 fig,ax = plt.subplots()
-ax.plot(o3[:,0,27,27])
+ax.plot(o3[:,0,27,49])
 
 #no espaco
 fig2,ax2 = plt.subplots()
-ax2.pcolor(lon,lat,np.mean(o3[0,0,:,:],axis = 0))
-shp = 
+ax2.pcolor(lon,lat,np.mean(o3[:,0,:,:],axis = 0))
+#shp = 
 
 
