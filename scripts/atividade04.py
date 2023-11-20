@@ -8,6 +8,8 @@ Created on Wed Nov 15 14:18:43 2023
 # ponto a ser investigado - Lages~ -27.81, -50.31
 lai = -27.81
 loi = -50.31
+# quantos dias tem o ultimo mes da serie temporal
+dd = 31
 ## dados de -entrada-
 
 # pacotes
@@ -21,10 +23,10 @@ import netCDF4 as nc
 import xarray as xr
 import pandas as pd
 
-# abrir arquivos, juntar e salvar novo arq
-dask.config.set({"array.slicing.split_large_chunks": False})
-ds = xr.open_mfdataset('D:/ENS410064/Dados/brutos/earth/GLDAS2/*.nc4', combine='nested', concat_dim="time")
-ds.to_netcdf('D:/ENS410064/Dados/brutos/earth/GLDAS_NOAH025_MASUB.nc4')
+# # abrir arquivos, juntar e salvar novo arq
+# dask.config.set({"array.slicing.split_large_chunks": False})
+# ds = xr.open_mfdataset('D:/ENS410064/Dados/brutos/earth/GLDAS2/*.nc4', combine='nested', concat_dim="time")
+# ds.to_netcdf('D:/ENS410064/Dados/brutos/earth/GLDAS_NOAH025_MASUB.nc4')
 
 # GLDAS2 documentation
 # Evap_tavg Evapotranspiration kg m-2 s-1
@@ -53,6 +55,11 @@ tmp = data['Tair_f_inst'][:]
 tveg = data['Tveg_tavg'][:]
 tempo = data['time']
 diasm = np.diff(tempo) # num de dias em cada mes
+diasm = np.append(diasm,dd) # falta o ultimo mes
+# acumulado da evap mensal, kg de h2o/m² = mm de h2o
+evapCum = ma.empty([284,20,27])
+for i in range(len(diasm)):
+    evapCum[i,:,:] = evap[i,:,:].__mul__(10800*8*diasm[i]) # em mm/mes
 
 # no espaco, TEMPO ZERO, so pra ver
 fig,ax = plt.subplots()
@@ -67,7 +74,6 @@ ax3.pcolor(lon,lat,tmp[0, :, :])
 fig4,ax4 = plt.subplots()
 ax4.pcolor(lon,lat,tveg[0, :, :])
 
-
 ## Variabilidade temporal (EM UM PIXEL)
 # media em ~lages -27.81, -50.31
 # encontrar lat lon mais prox 
@@ -79,7 +85,7 @@ xi=find_nearest(lon, loi)
 #lon[0,17] -50,375 lat[7,0] -27,875
 
 # dfs for descriptive stats on timeseries of lages
-df_evap = pd.DataFrame(evap[:,yi,xi])
+df_evap = pd.DataFrame(evapCum[:,yi,xi])
 df_alb = pd.DataFrame(alb[:,yi,xi])
 df_tmp = pd.DataFrame(tmp[:,yi,xi])
 df_tveg = pd.DataFrame(tveg[:,yi,xi])
@@ -106,7 +112,7 @@ plt.figtext(0.75,0.5, df_tmp.describe().loc[['mean','std']].to_string())
 
 # variacao no tempo em lages
 fig9,ax9 = plt.subplots()
-ax9.plot(evap[:,yi,xi])
+ax9.plot(evapCum[:,yi,xi])
 
 
 ## Variabilidade espacial (TODOS PIXELS)
@@ -123,10 +129,4 @@ ax3.pcolor(lon,lat,np.mean(tmp[:, :, :], axis = 0))
 fig4,ax4 = plt.subplots()
 ax4.pcolor(lon,lat,np.mean(tveg[:, :, :],axis = 0 ))
 
-# acumulado da evap
-# To compute the latter, use this formula:
-# Evap_tavg (April){kg/m2} = Evap_tavg (April){kg/m2/sec} * 10800{sec/3hr} * 8{3hr/day} * 30{days}
-evapCum=[]
-for i in diasm:
-    evapCum[i,:,:] = evap[i,:,:] *10800 * 8 * diasm[i]
 
