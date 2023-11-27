@@ -8,13 +8,13 @@ Created on Wed Nov 15 14:18:43 2023
 # ponto a ser investigado - Lages~ -27.81, -50.31 - Coxilha -28,20 -50,33
 lai = -28.20
 loi = -50.33
-# quantos dias tem o ultimo mes da serie temporal
-dd = 31
+t0 = '2000-01-01' # quando inicia a serie temporal
 ## dados de -entrada-
 
 # pacotes
 #import os
 #import dask
+import datetime
 import numpy as np
 import numpy.ma as ma
 #import math
@@ -47,9 +47,6 @@ import pymannkendall as mk
 # conferir
 data = nc.Dataset('D:/ENS410064/Dados/brutos/earth/GLDAS_NOAH025_MASUB.nc4')
 #data = nc.Dataset(r'C:\Users\anafranco\Documents\ENS410064\GLDAS_NOAH025_MASUB.nc4')
-#data1 = nc.Dataset(r"D:\ENS410064\Dados\brutos\earth\GLDAS2\GLDAS_NOAH025_M.A202204.021.nc4.SUB.nc4")
-
-#data2 = data.subset(time=[0,283]) # descobrir como fazer subsets
 
 # extraindo dados 
 lon = data['lon'][:]
@@ -58,13 +55,17 @@ evap = data['Evap_tavg'][:]
 alb = data['Albedo_inst'][:]
 tmp = data['Tair_f_inst'][:]
 tveg = data['Tveg_tavg'][:]
-tempo = data['time']
-diasm = np.diff(tempo) # num de dias em cada mes
-diasm = np.append(diasm,dd) # falta o ultimo mes
+tempo = data['time'] # dias desde 01-01-2000
+dia = data['time_bnds'][:] #intervalo dias cada mes
+diasm = dia[:,1]-dia[:,0] # quantos dias cada mes
+# temperatura em celsius??
 # acumulado da evap mensal, kg de h2o/m² = mm de h2o
-evapCum = ma.empty([284,20,27])
+evapCum = ma.empty([tempo.size,lat.size,lon.size])
 for i in range(len(diasm)):
     evapCum[i,:,:] = evap[i,:,:].__mul__(10800*8*diasm[i]) # em mm/mes
+
+# criando vetor temporal de datas
+dtime = np.arange(np.datetime64(t0), np.datetime64(t0) + np.timedelta64(np.int64(dia[tempo.size-1,1]),'D') , dtype='datetime64[M]')
 
 ## Variabilidade espacial (TODOS PIXELS)
 # MEDIAS 
@@ -121,31 +122,19 @@ b=np.arange(start=9,stop=283,step=12)
 c=np.arange(start=10,stop=283,step=12)
 pri=np.sort(np.concatenate((a,b,c),axis=0))
 del a, b ,c
-estac = ['outono','inverno','primavera','verao']
-# out=evapCum.reshape(2,5)[::12].ravel()
+est = [ver,out,inv,pri]
+estac = ['verao','outono','inverno','primavera']
 mynorm = plt.Normalize(vmin=0, vmax=180)
 
 fig,ax = plt.subplots(2,2,sharex=True) 
 ax = ax.flatten() # nao importa a ordem dos plots
-# for i in range (0,3): # nao funcionou
-#     im = ax[i].pcolor(lon,lat,np.mean(evapCum[out, :, :], axis = 0),norm=mynorm)
-#     ax[i].title.set_text(estac[i])
-#     fig.colorbar(im, ax=ax[i])
-im1 = ax[0].pcolor(lon,lat,np.mean(evapCum[out, :, :], axis = 0),norm=mynorm)
-ax[0].title.set_text(estac[0])
-fig.colorbar(im1, ax=ax[0])
-im2 = ax[1].pcolor(lon,lat,np.mean(evapCum[inv, :, :], axis = 0),norm=mynorm)
-ax[1].title.set_text(estac[1])
-fig.colorbar(im2, ax=ax[1])
-im3 = ax[2].pcolor(lon,lat,np.mean(evapCum[pri, :, :], axis = 0),norm=mynorm)
-ax[2].title.set_text(estac[2])
-fig.colorbar(im3, ax=ax[2])
-im4 = ax[3].pcolor(lon,lat,np.mean(evapCum[ver, :, :], axis = 0),norm=mynorm)
-ax[3].title.set_text(estac[3])
-fig.colorbar(im4, ax=ax[3])
+for i in range (0,4): # nao funcionou
+    im = ax[i].pcolor(lon,lat,np.mean(evapCum[est[i], :, :], axis = 0),norm=mynorm)
+    ax[i].title.set_text(estac[i])
+    fig.colorbar(im, ax=ax[i])    
 
 ## Variabilidade temporal (EM UM PIXEL)
-# encontrar lat lon mais prox 
+# encontrar lat lon mais prox do ponto escolhido la no comeco do script
 def find_nearest(array, values):
     idx = (np.abs(array-values)).argmin()
     return idx
@@ -155,9 +144,24 @@ xi=find_nearest(lon, loi)
 
 # dfs for descriptive stats on timeseries of choosen point
 df_evap = pd.DataFrame(evapCum[:,yi,xi])
+df_evap['datetime'] = dtime # set index datetime
+df_evap = df_evap.set_index(df_evap['datetime']) # set index datetime
+df_evap.drop('datetime',axis=1, inplace=True)# drop column
+
 df_alb = pd.DataFrame(alb[:,yi,xi])
+df_alb['datetime'] = dtime # set index datetime
+df_alb = df_alb.set_index(df_alb['datetime']) # set index datetime
+df_alb.drop('datetime',axis=1, inplace=True)# drop column
+
 df_tmp = pd.DataFrame(tmp[:,yi,xi])
+df_tmp['datetime'] = dtime # set index datetime
+df_tmp = df_tmp.set_index(df_tmp['datetime']) # set index datetime
+df_tmp.drop('datetime',axis=1, inplace=True)# drop column
+
 df_tveg = pd.DataFrame(tveg[:,yi,xi])
+df_tveg['datetime'] = dtime # set index datetime
+df_tveg = df_tveg.set_index(df_tveg['datetime']) # set index datetime
+df_tveg.drop('datetime',axis=1, inplace=True)# drop column
 
 fig5, ax5 = plt.subplots()
 ax5.hist(df_evap)
@@ -185,48 +189,75 @@ plt.title('Temperatura do ar')
 
 # variacao no tempo em lages
 fig9,ax9 = plt.subplots()
-ax9.plot(evapCum[:,yi,xi])
+ax9.plot(df_evap)#evapCum[:,yi,xi])
 plt.title('Evapotranspiracao no ponto escolhido')
 
 # verificar se há tendencia e sazonalidade
 # mann-kendall
-result = mk.original_test(evapCum[:,yi,xi])
+result = mk.original_test(df_evap)#evapCum[:,yi,xi])
 print(result)
 # decomposicao
-components = seasonal_decompose(evapCum[:,yi,xi], model='aditive', period=12) 
+components = seasonal_decompose(df_evap, model='aditive', period=12)#evapCum[:,yi,xi] 
 fig10 = components.plot()
 fig10.suptitle('Evapotranspiracao')
 
 # e a transpiracao da veg?
 # verificar se há tendencia e sazonalidade
 # mann-kendall
-result = mk.original_test(tveg[:,yi,xi])
+result = mk.original_test(df_tveg)
 print(result)
 # decomposicao
-components = seasonal_decompose(tveg[:,yi,xi], model='aditive', period=12) 
+components = seasonal_decompose(df_tveg, model='aditive', period=12) 
 fig11 = components.plot()
 fig11.suptitle('Transpiracao')
 
 # e o albedo reflete as mudanças de uso do solo?
 # verificar se há tendencia e sazonalidade
 # mann-kendall
-result = mk.original_test(alb[:,yi,xi])
+result = mk.original_test(df_alb)
 print(result)
 # decomposicao
-components = seasonal_decompose(alb[:,yi,xi], model='aditive', period=12) 
+components = seasonal_decompose(df_alb, model='aditive', period=12) 
 fig11 = components.plot()
 fig11.suptitle('Albedo')
 
 # e a temperatura?
 # verificar se há tendencia e sazonalidade
 # mann-kendall
-result = mk.original_test(tmp[:,yi,xi])
+result = mk.original_test(df_tmp)
 print(result)
 # decomposicao
-components = seasonal_decompose(tmp[:,yi,xi], model='aditive', period=12) 
+components = seasonal_decompose(df_tmp, model='aditive', period=12) 
 fig11 = components.plot()
 fig11.suptitle('Temperatura')
 
 
 # fazer mann-kendall para toda a area
+# iterar?
+output = []
+for i in np.arange(len(evapCum[0,:,0])):
+    for j in np.arange(len(evapCum[0,0,:])):
+        trend = mk.original_test(evapCum[:,i,j]).trend
+        output.append(trend)
+
+output = np.copy(output).reshape(len(lat),len(lon))
+trends = ['decreasing','no trend','increasing'] # to replace
+
+output[output == trends[0]]=int(-1)
+output[output == trends[1]]=int(0)
+output[output == trends[2]]=int(1)
+output = ma.masked_array(output,evapCum[0,:,:].mask)
+output.astype(float)
+# plot
+fig12,ax12 = plt.subplots()
+ax12.pcolor(lon, lat, output)
+plt.title('trend')
+
 # baixar dados em area maior, fazer mascara para bacias??
+# trend, h, p, z, Tau, s, var_s, slope, intercept = mk.original_test(evapCum[:,i,j])
+
+
+
+
+
+
