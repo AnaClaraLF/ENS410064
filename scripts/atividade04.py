@@ -234,28 +234,45 @@ fig11.suptitle('Temperatura')
 
 # fazer mann-kendall para toda a area
 # iterar?
-output = []
+outputt = []
+outputh = []
+outputs = []
 for i in np.arange(len(evapCum[0,:,0])):
     for j in np.arange(len(evapCum[0,0,:])):
-        trend = mk.original_test(evapCum[:,i,j]).trend
-        output.append(trend)
+        trend, h, p, z, Tau, s, var_s, slope, intercept = mk.seasonal_test(evapCum[:,i,j], period=12)#mk.original_test(evapCum[:,i,j])
+        outputt.append(trend)
+        outputh.append(h)
+        outputs.append(slope)
 
-output = np.copy(output).reshape(len(lat),len(lon))
+outputt = np.copy(outputt).reshape(len(lat),len(lon))
+outputh = np.copy(outputh).reshape(len(lat),len(lon))
+outputs = np.copy(outputs).reshape(len(lat),len(lon))
 trends = ['decreasing','no trend','increasing'] # to replace
 
-output[output == trends[0]]=int(-1)
-output[output == trends[1]]=int(0)
-output[output == trends[2]]=int(1)
-output = ma.masked_array(output,evapCum[0,:,:].mask)
+# output[output == trends[0]]=int(-1)
+# output[output == trends[1]]=int(0)
+# output[output == trends[2]]=int(1)
+outputh = ma.masked_array(outputh,evapCum[0,:,:].mask)
+outputs = ma.masked_array(outputs,evapCum[0,:,:].mask)
 output.astype(float)
 # plot
 fig12,ax12 = plt.subplots()
-ax12.pcolor(lon, lat, output)
+ax12.pcolor(lon, lat, outputh)
 plt.title('trend')
 
 # baixar dados em area maior, fazer mascara para bacias??
-# trend, h, p, z, Tau, s, var_s, slope, intercept = mk.original_test(evapCum[:,i,j])
+evap_ij = pd.DataFrame(evapCum[:,i,j])
+evap_ij = pd.DataFrame(evapCum[:,i,j])
+evap_ij['datetime'] = dtime # set index datetime
+evap_ij = evap_ij.set_index(evap_ij['datetime']) # set index datetime
+evap_ij.drop('datetime',axis=1, inplace=True)# drop column
 
+trend_line = np.arange(len(evap_ij)) / 12 * res.slope + res.intercept
+
+fig13,ax13 = plt.subplots()
+ax13.plot(evap_ij)
+ax13.plot(evap_ij.index, trend_line)
+ax13.legend(['data', 'trend line'])
 
 
 
