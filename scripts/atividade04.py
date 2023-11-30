@@ -14,7 +14,6 @@ t0 = '2000-01-01' # quando inicia a serie temporal
 # pacotes
 #import os
 #import dask
-import datetime
 import numpy as np
 import numpy.ma as ma
 #import math
@@ -248,17 +247,18 @@ outputt = np.copy(outputt).reshape(len(lat),len(lon))
 outputh = np.copy(outputh).reshape(len(lat),len(lon))
 outputs = np.copy(outputs).reshape(len(lat),len(lon))
 trends = ['decreasing','no trend','increasing'] # to replace
-
-# output[output == trends[0]]=int(-1)
-# output[output == trends[1]]=int(0)
-# output[output == trends[2]]=int(1)
+outputt[outputt == trends[0]]=int(-1)
+outputt[outputt == trends[1]]=int(0)
+outputt[outputt == trends[2]]=int(1)
+outputt = np.int_(outputt)
 outputh = ma.masked_array(outputh,evapCum[0,:,:].mask)
 outputs = ma.masked_array(outputs,evapCum[0,:,:].mask)
-output.astype(float)
+outputt = ma.masked_array(outputt,evapCum[0,:,:].mask)
 # plot
 fig12,ax12 = plt.subplots()
-ax12.pcolor(lon, lat, outputh)
+im12 = ax12.pcolor(lon, lat, outputt)
 plt.title('trend')
+fig12.colorbar(im12,ax=ax12)
 
 # baixar dados em area maior, fazer mascara para bacias??
 evap_ij = pd.DataFrame(evapCum[:,i,j])
@@ -266,7 +266,7 @@ evap_ij = pd.DataFrame(evapCum[:,i,j])
 evap_ij['datetime'] = dtime # set index datetime
 evap_ij = evap_ij.set_index(evap_ij['datetime']) # set index datetime
 evap_ij.drop('datetime',axis=1, inplace=True)# drop column
-
+res = mk.seasonal_test(evap_ij, period=12)
 trend_line = np.arange(len(evap_ij)) / 12 * res.slope + res.intercept
 
 fig13,ax13 = plt.subplots()
